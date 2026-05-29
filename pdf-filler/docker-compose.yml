@@ -1,0 +1,52 @@
+# docker-compose.yml — pdf-filler API
+#
+# Uso standard (monta la dir corrente con schema.json + PDF template):
+#   docker compose up
+#
+# Multi-worker:
+#   WORKERS=4 docker compose up
+#
+# Solo rilevamento campi (esegue e termina):
+#   docker compose run --rm detect --pdf /data/template.pdf --schema /data/schema.json --verbose
+
+services:
+
+  # ── API server ─────────────────────────────────────────────────────────────
+  pdf-filler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: pdf-filler:latest
+    container_name: pdf-filler-api
+    ports:
+      - "0.0.0.0:${PORT:-8765}:${PORT:-8765}"
+    volumes:
+      - "${DATA_DIR:-.}:/data"
+    command:
+      - "--schema"
+      - "/data/schema.json"
+      - "--port"
+      - "${PORT:-8765}"
+      - "--host"
+      - "0.0.0.0"
+      - "--workers"
+      - "${WORKERS:-1}"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:${PORT:-8765}/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+  # ── Rilevamento automatico campi (run & exit) ──────────────────────────────
+  detect:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: pdf-filler:latest
+    volumes:
+      - "${DATA_DIR:-.}:/data"
+    command: ["detect"]
+    profiles:
+      - detect
